@@ -1,0 +1,55 @@
+<html>
+<head>
+  <link rel="stylesheet" href="astrojs.css" type="text/css" charset="utf-8">
+  <script type="text/javascript" src="lib/fits.js"></script>
+  
+  <script type="text/javascript" src="lib/gl-matrix.js"></script>
+  <script type="text/javascript" src="../lib/volumetric.js"></script>
+  
+  <script type="text/javascript">
+  
+  function main() {
+    
+    // Initialize Volumetric object
+    var el = document.querySelector("#volume");
+    var volume = new astro.Volumetric(el, 700);
+    var startFrame = 150;
+    // var startFrame = 15;
+    
+    new astro.FITS('./data/L1448_13CO.fits', function(f) {
+      
+      var cube = f.getDataUnit();
+      var width = cube.width;
+      var height = cube.height;
+      var depth = 100;
+      
+      var pixels = new Float32Array(width * height * depth);
+      var frame = 0;
+      
+      cube.getFrames(startFrame, depth, function(arr) {
+        pixels.set(arr, width * height * frame);
+        
+        frame += 1;
+        if (frame === depth) {
+          var extent = cube.getExtent(pixels);
+          volume.setExtent(extent[0], extent[1]);
+          volume.setTexture(pixels, width, height, depth);
+          volume.draw();
+          
+          // Test
+          window.volume = volume;
+        }
+      });
+    })
+  }
+  </script>
+  
+</head>
+
+<body onload='main()'>
+  <div class='content'>
+    <h3>Simple Volumetric Rendering</h3>
+    <div id="volume"></div>
+  </div>
+</body>
+</html>
