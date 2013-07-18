@@ -273,37 +273,6 @@ class Volumetric
     return null unless ext
     
     shaders = @constructor.Shaders
-    @programs['back'] = @_createProgram(gl, shaders.vertex, shaders.fragment)
-    @programs['raycast'] = @_createProgram(gl, shaders.raycastVertex, shaders.raycastFragment)
-    
-    # Get uniforms
-    @uMinimum = gl.getUniformLocation( @programs.raycast, "uMinimum" )
-    @uMaximum = gl.getUniformLocation( @programs.raycast, "uMaximum" )
-    @uBackCoord = gl.getUniformLocation( @programs.raycast, "uBackCoord" )
-    @uVolData = gl.getUniformLocation( @programs.raycast, "uVolData" )
-    @uXTiles = gl.getUniformLocation( @programs.raycast, "uXTiles" )
-    @uYTiles = gl.getUniformLocation( @programs.raycast, "uYTiles" )
-    @uTiles = gl.getUniformLocation( @programs.raycast, "uTiles" )
-    @uSteps = gl.getUniformLocation( @programs.raycast, "uSteps" )
-    
-    @frameBuffer = @_initFrameBuffer(gl, @width, @height)
-    @cubeBuffer = @_initCubeBuffer(gl)
-    
-    @zoom = 2.0
-    
-    # Perspective, model-view, and rotation matrices
-    @pMatrix = mat4.create()
-    @mvMatrix = mat4.create()
-    @rotationMatrix = mat4.create()
-    
-    mat4.perspective(@pMatrix, 45.0, 1.0, 0.1, 100.0)
-    mat4.identity(@rotationMatrix)
-    
-    # Set defaults for step and tiles
-    @_setTiles(10, 10)
-    @setSteps(50)
-    
-    @_setupMouseControls()
   
   setExtent: (@minimum, @maximum) ->
     @gl.useProgram( @programs.raycast )
