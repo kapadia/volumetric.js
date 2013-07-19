@@ -1,5 +1,4 @@
 
-
 class Volumetric
   
   
@@ -188,18 +187,18 @@ class Volumetric
     @gl.uniformMatrix4fv(program.uPMatrix, false, @pMatrix)
     @gl.uniformMatrix4fv(program.uMVMatrix, false, @mvMatrix)
   
-  _setTiles: (x, y) ->
-    @gl.useProgram( @programs['raycast'] )
-    
-    @xTiles = x
-    @yTiles = y
-    
-    @gl.uniform1f(@uXTiles, x)
-    @gl.uniform1f(@uYTiles, y)
-    @gl.uniform1f(@uTiles, x * y)
-  
   _toRadians: (deg) ->
     return deg * 0.017453292519943295
+  
+  _toPower2: (v) ->
+    v--
+    v |= v >> 1
+    v |= v >> 2
+    v |= v >> 4
+    v |= v >> 8
+    v |= v >> 16
+    v++
+    return v
   
   _setupMouseControls: ->
     
@@ -226,14 +225,13 @@ class Volumetric
       
       rotationMatrix = mat4.create()
       mat4.identity(rotationMatrix)
-      
-      mat4.rotate(rotationMatrix, rotationMatrix, @_toRadians(deltaX / 5), [0, 1, 0])
-      mat4.rotate(rotationMatrix, rotationMatrix, @_toRadians(deltaY / 5), [1, 0, 0])
-      
+      mat4.rotateY(rotationMatrix, rotationMatrix, @_toRadians(deltaX / 4))
+      mat4.rotateX(rotationMatrix, rotationMatrix, @_toRadians(deltaY / 4))
       mat4.multiply(@rotationMatrix, rotationMatrix, @rotationMatrix)
       
       @xOldOffset = x
       @yOldOffset = y
+      
       @draw()
     
     @canvas.onmouseout = (e) =>
@@ -273,75 +271,110 @@ class Volumetric
     return null unless ext
     
     shaders = @constructor.Shaders
+    
+    # Initialize programs from shaders
+    @programs["back"] = @_createProgram(gl, shaders.vertex, shaders.fragment)
+    @programs["raycast"] = @_createProgram(gl, shaders.raycastVertex, shaders.raycastFragment)
+    
+    # Get uniform locations
+    @uMinimum = gl.getUniformLocation(@programs.raycast, "uMinimum")
+    @uMaximum = gl.getUniformLocation(@programs.raycast, "uMaximum")
+    @uRange = gl.getUniformLocation(@programs.raycast, "uRange")
+    
+    @uTileWidth = gl.getUniformLocation(@programs.raycast, "uTileWidth")
+    @uTileHeight = gl.getUniformLocation(@programs.raycast, "uTileHeight")
+    @uDimension = gl.getUniformLocation(@programs.raycast, "uDimension")
+    
+    @uBackCoord = gl.getUniformLocation(@programs.raycast, "uBackCoord")
+    @uVolData = gl.getUniformLocation(@programs.raycast, "uVolData")
+    
+    @uTiles = gl.getUniformLocation(@programs.raycast, "uTiles")
+    @uSteps = gl.getUniformLocation(@programs.raycast, "uSteps")
+    
+    @uOpacity = gl.getUniformLocation(@programs.raycast, "uOpacity")
+    @uLighting = gl.getUniformLocation(@programs.raycast, "uLight")
+    
+    # Initialize buffers
+    # TODO: Use packed buffers
+    @frameBuffer = @_initFrameBuffer(gl, @width, @height)
+    @cubeBuffer = @_initCubeBuffer(gl)
+    
+    # Set up camera parameters
+    @zoom = 2.0
+    @pMatrix = mat4.create()
+    @mvMatrix = mat4.create()
+    @rotationMatrix = mat4.create()
+    
+    mat4.perspective(@pMatrix, 45.0, 1.0, 0.1, 100.0)
+    mat4.identity(@rotationMatrix)
+    
+    # Set defaults
+    @setSteps(70)
+    @setOpacity(2.0)
+    @setLighting(0.3)
+    
+    @_setupMouseControls()
+    
+    @hasTexture = false
   
   setExtent: (@minimum, @maximum) ->
     @gl.useProgram( @programs.raycast )
     
     @gl.uniform1f(@uMinimum, @minimum)
     @gl.uniform1f(@uMaximum, @maximum)
+    @gl.uniform1f(@uRange, @maximum - @minimum)
     
     @draw()
     
   setSteps: (steps) ->
     @gl.useProgram( @programs.raycast )
-    
     @gl.uniform1f(@uSteps, steps)
     
     @draw()
   
+  setOpacity: (opacity) ->
+    @gl.useProgram( @programs.raycast )
+    @gl.uniform1f(@uOpacity, opacity)
+    
+    @draw()
+  
+  setLighting: (lighting) ->
+    @gl.useProgram( @programs.raycast )
+    @gl.uniform1f(@uLighting, lighting)
+    
+    @draw()
+  
   setTexture: (arr, width, height, depth) ->
+    length = arr.length
     
-    textureWidth = @xTiles * width
-    textureHeight = @yTiles * height
+    dimension = Math.sqrt(length)
+    dimension = @_toPower2(dimension)
+    @gl.uniform1f(@uTiles, depth)
     
-    # Rearrange pixels
-    # TODO: Offload this process to the GPU
-    nPixels = width * height
-    pixels = new arr.constructor(arr.length)
+    # Replace NaNs here because OpenGL ES2.0 has no NaN check
+    while length--
+      arr[length] = if isNaN(arr[length]) then 0 else arr[length]
     
-    i = arr.length
-    while i--
-      
-      # Get frame coordinate
-      z = ~~(i / nPixels)
-      
-      # Get tile coordinate
-      xTile = z % @xTiles
-      yTile = ~~(z / @yTiles)
-      
-      # Get tile offsets (units of pixels)
-      xOffset = xTile * width
-      yOffset = yTile * height
-      
-      #
-      # Get pixel coordinates
-      #
-      
-      # Get index with respect to single frame
-      j = i % nPixels
-      
-      # Get x and y with respect to single frame
-      x = j % width
-      y = ~~(j / width)
-      
-      # Get x and y with respect to texture frame
-      x += xOffset
-      y += yOffset
-      
-      # Get repositioned index
-      index = y * textureWidth + x
-      pixels[index] = if isNaN(arr[i]) then 0 else arr[i]
-      
+    # Create typed array with correct texture size
+    pixels = new arr.constructor(dimension * dimension)
+    pixels.set(arr, 0)
+    
     # Send texture to GPU
-    @texture = @gl.createTexture()
-    @gl.bindTexture(@gl.TEXTURE_2D, @texture)
-    @gl.texParameteri(@gl.TEXTURE_2D, @gl.TEXTURE_WRAP_S, @gl.CLAMP_TO_EDGE)
-    @gl.texParameteri(@gl.TEXTURE_2D, @gl.TEXTURE_WRAP_T, @gl.CLAMP_TO_EDGE)
-    @gl.texParameteri(@gl.TEXTURE_2D, @gl.TEXTURE_MIN_FILTER, @gl.NEAREST)
-    @gl.texParameteri(@gl.TEXTURE_2D, @gl.TEXTURE_MAG_FILTER, @gl.NEAREST)
-    @gl.texImage2D(@gl.TEXTURE_2D, 0, @gl.LUMINANCE, textureWidth, textureHeight, 0, @gl.LUMINANCE, @gl.FLOAT, pixels)
+    unless @hasTexture
+      @gl.uniform1f(@uTileWidth, width)
+      @gl.uniform1f(@uTileHeight, height)
+      @gl.uniform1f(@uDimension, dimension)
+      
+      @texture = @gl.createTexture()
+      @gl.bindTexture(@gl.TEXTURE_2D, @texture)
+      @gl.texParameteri(@gl.TEXTURE_2D, @gl.TEXTURE_WRAP_S, @gl.CLAMP_TO_EDGE)
+      @gl.texParameteri(@gl.TEXTURE_2D, @gl.TEXTURE_WRAP_T, @gl.CLAMP_TO_EDGE)
+      @gl.texParameteri(@gl.TEXTURE_2D, @gl.TEXTURE_MIN_FILTER, @gl.NEAREST)
+      @gl.texParameteri(@gl.TEXTURE_2D, @gl.TEXTURE_MAG_FILTER, @gl.NEAREST)
+    @gl.texImage2D(@gl.TEXTURE_2D, 0, @gl.LUMINANCE, dimension, dimension, 0, @gl.LUMINANCE, @gl.FLOAT, pixels)
     
     @gl.bindTexture(@gl.TEXTURE_2D, null)
+    @hasTexture = true
   
   _drawCube: (program) ->
     @gl.clear(@gl.COLOR_BUFFER_BIT | @gl.DEPTH_BUFFER_BIT)
@@ -384,12 +417,12 @@ class Volumetric
     @gl.activeTexture(@gl.TEXTURE1)
     @gl.bindTexture(@gl.TEXTURE_2D, @texture)
     
-    # NOTE: Does this need to be called every time?
     @gl.uniform1i(@uBackCoord, 0)
     @gl.uniform1i(@uVolData, 1)
     
     @_drawCube(@programs.raycast)
 
 
+@astro = {} unless @astro?
 @astro.Volumetric = Volumetric
 @astro.Volumetric.version = '0.1.0'

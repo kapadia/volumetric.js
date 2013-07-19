@@ -1,0 +1,261 @@
+<html>
+<head>
+  <link rel="stylesheet" href="astrojs.css" type="text/css" charset="utf-8">
+  <script type="text/javascript" src="lib/fits.js"></script>
+  
+  <script type="text/javascript" src="lib/html5slider.js"></script>
+  <script type="text/javascript" src="lib/gl-matrix.js"></script>
+  <script type="text/javascript" src="../lib/volumetric.js"></script>
+  
+  <style>
+  .content {
+    display: block;
+  }
+  
+  .volume {
+    float: left;
+    width: 600px;
+    height: 600px;
+    border: 1px solid #0071e5;
+    margin-right: 20px;
+  }
+  
+  .drop {
+    float: left;
+    width: 200px;
+    height: 200px;
+    border: 1px solid #0071e5;
+  }
+  
+  .hide {
+    display: none;
+  }
+  
+  .drop:hover {
+    background-color: #FCFCFC;
+  }
+  
+  .drop p {
+    text-align: center;
+    margin-top: 43%;
+    font-weight: 700;
+    color: #000;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.5);
+    opacity: 0.6;
+  }
+  
+  
+  .parameter {
+    float: left;
+    width: 300px;
+  }
+  
+  input {
+    width: 300px;
+  }
+  
+  </style>
+  
+  <script type="text/javascript">
+  
+  var dropEl, paramsEl, volumeEl;
+  var volume;
+  var gMinimum, gMaximum;
+  var minimum, maximum;
+  var startEl;
+  var cube;
+  
+  function connectUI() {
+    var lightingEl = document.querySelector("input[data-type='lighting']")
+    var opacityEl = document.querySelector("input[data-type='opacity']")
+    var minimumEl = document.querySelector("input[data-type='minimum']")
+    var maximumEl = document.querySelector("input[data-type='maximum']")
+    var stepEl = document.querySelector("input[data-type='steps']")
+    startEl = document.querySelector("input[data-type='start']")
+    
+    lightingEl.onchange = function(e) {
+      volume.setLighting(e.target.value);
+    }
+    
+    opacityEl.onchange = function(e) {
+      volume.setOpacity(e.target.value);
+    }
+    
+    minimumEl.onchange = function(e) {
+      value = e.target.value;
+      minimum = (gMaximum - gMinimum) / 1000 * value + gMinimum
+      volume.setExtent(minimum, maximum);
+    }
+    
+    maximumEl.onchange = function(e) {
+      value = e.target.value;
+      maximum = (gMaximum - gMinimum) / 1000 * value + gMinimum
+      volume.setExtent(minimum, maximum);
+    }
+    
+    stepEl.onchange = function(e) {
+      volume.setSteps(e.target.value);
+    }
+    
+    startEl.onmouseup = function(e) {
+      var startFrame = parseInt(e.target.value);
+      
+      var width = cube.width;
+      var height = cube.height;
+      var cubeDepth = cube.depth;
+      var depth = cubeDepth - startFrame;
+      
+      if (depth < 100) {
+        depth = 100;
+        startFrame = cubeDepth - depth;
+      }
+      if (depth > 100) {
+        depth = 100;
+      }
+      
+      var frame = 0;
+      var pixels = new Float32Array(width * height * depth);
+      
+      // Clean up buffers
+      // TODO: This needs to be brought into fitsjs
+      offsets = cube.frameOffsets;
+      for (var i = 0; i < offsets.length; i += 1) {
+        delete offsets[i].buffers;
+      }
+      
+      cube.getFrames(startFrame, depth, function(arr) {
+        pixels.set(arr, width * height * frame);
+        frame += 1
+        
+        if (frame === depth) {
+          volume.setTexture(pixels, width, height, depth);
+          volume.draw();
+        }
+      });
+    }
+    
+  }
+  
+  function onDragOver(e) {
+    e.stopPropagation();
+    e.preventDefault();
+  }
+  
+  function onDrop(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    // Remove event listeners
+    this.removeEventListener('dragover', onDragOver, false);
+    this.removeEventListener('drop', onDrop, false);
+    
+    // Hide drop area and show parameters
+    dropEl.className = 'drop hide'
+    paramsEl.className = 'parameters'
+    
+    // Get just the first file
+    var f = e.dataTransfer.files[0];
+    
+    // Initialize FITS object
+    var fits = new astro.FITS(f, function(fits) {
+      var startFrame = 0;
+      
+      cube = fits.getDataUnit();
+      var width = cube.width;
+      var height = cube.height;
+      var depth = cube.depth;
+      
+      // Allocate storage for cube
+      var pixels = new Float32Array(width * height * depth);
+      var frame = 0;
+      
+      // Begin reading data from file
+      cube.getFrames(startFrame, depth, function(arr) {
+        pixels.set(arr, width * height * frame);
+        
+        frame += 1;
+        if (frame === depth) {
+          var extent = cube.getExtent(pixels);
+          
+          gMinimum = minimum = extent[0];
+          gMaximum = maximum = extent[1];
+          
+          volume.setExtent.apply(volume, extent);
+          console.log(depth);
+          volume.setTexture(pixels, width, height, depth);
+          volume.draw();
+          connectUI();
+          
+          // Use cube metadata to update UI components
+          startEl.max = cube.depth;
+        }
+      });
+      
+    });
+  }
+  
+  function main() {
+    
+    // Get DOM elements
+    dropEl = document.querySelector('.drop');
+    volumeEl = document.querySelector(".volume");
+    paramsEl = document.querySelector(".parameters");
+    
+    // Initialize Volumetric object
+    volume = new astro.Volumetric(volumeEl, 600);
+    
+    // Listen for drop events
+    dropEl.addEventListener('dragover', onDragOver, false);
+    dropEl.addEventListener('drop', onDrop, false);
+  }
+  </script>
+  
+</head>
+
+<body onload='main()'>
+  <div class='content'>
+    <h3>Drop a Volume</h3>
+    <p>This demo allows you to drop a FITS data cube from the local filesystem to generate a volume rendering.</p>
+    
+    <div class="volume"></div>
+    
+    <div class="drop">
+      <p>drop a cube</p>
+    </div>
+    
+    <div class='parameters hide'>
+      <div class='parameter'>
+        <label>Lighting</label>
+        <input type="range" data-type='lighting' min="0" max="10" step="0.01" value="0.3">
+      </div>
+      
+      <div class='parameter'>
+        <label>Opacity</label>
+        <input type="range" data-type='opacity' min="0" max="100" step="0.01" value="2.0">
+      </div>
+      
+      <div class='parameter'>
+        <label>Minimum</label>
+        <input type="range" data-type='minimum' min="0" max="1000" step="1" value="0">
+      </div>
+      
+      <div class='parameter'>
+        <label>Maximum</label>
+        <input type="range" data-type='maximum' min="0" max="1000" step="1" value="1000">
+      </div>
+      
+      <div class='parameter'>
+        <label>Steps</label>
+        <input type="range" data-type='steps' min="3" max="500" step="1" value="70">
+      </div>
+      
+      <div class='parameter'>
+        <label>Start Frame</label>
+        <input type="range" data-type='start' min="0" max step="1" value="0">
+      </div>
+      
+    </div>
+    
+  </div>
+</body>
+</html>
