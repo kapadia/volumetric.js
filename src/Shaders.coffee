@@ -87,12 +87,29 @@ Shaders =
       "float index1 = zp1 * uTileWidth * uTileHeight + yp * uTileWidth + xp;"
       "float index2 = zp2 * uTileWidth * uTileHeight + yp * uTileWidth + xp;"
       
+      #
       # Get 2D pixel texture coordinates
+      #
+      
+      # First frame
       "float xt1 = mod(index1, uDimension);"
       "float yt1 = floor(index1 / uDimension);"
       
+      # "float xt1_0 = mod(index1 - 1.0, uDimension);"
+      # "float yt1_0 = floor((index1 - 1.0) / uDimension);"
+      # 
+      # "float xt1_2 = mod(index1 + 1.0, uDimension);"
+      # "float yt1_2 = floor((index1 + 1.0) / uDimension);"
+      
+      # Second frame
       "float xt2 = mod(index2, uDimension);"
       "float yt2 = floor(index2 / uDimension);"
+      
+      # "float xt2_0 = mod(index2 - 1.0, uDimension);"
+      # "float yt2_0 = floor((index2 - 1.0) / uDimension);"
+      # 
+      # "float xt2_2 = mod(index2 + 1.0, uDimension);"
+      # "float yt2_2 = floor((index2 + 1.0) / uDimension);"
       
       # Get normalized 2D texture coordinates
       "texturePosition1.x = xt1 / uDimension;"
@@ -101,9 +118,35 @@ Shaders =
       "texturePosition2.x = xt2 / uDimension;"
       "texturePosition2.y = yt2 / uDimension;"
       
+      # "vec2 texturePosition1_0;"
+      # "vec2 texturePosition1_2;"
+      # "vec2 texturePosition2_0;"
+      # "vec2 texturePosition2_2;"
+      # 
+      # "texturePosition1_0.x = xt1_0 / uDimension;"
+      # "texturePosition1_0.y = yt1_0 / uDimension;"
+      # 
+      # "texturePosition1_2.x = xt1_2 / uDimension;"
+      # "texturePosition1_2.x = yt1_2 / uDimension;"
+      # 
+      # "texturePosition2_0.x = xt2_0 / uDimension;"
+      # "texturePosition2_0.y = yt2_0 / uDimension;"
+      # 
+      # "texturePosition2_2.x = xt2_2 / uDimension;"
+      # "texturePosition2_2.x = yt2_2 / uDimension;"
+      
       # Get texture values
       "float value1 = texture2D(uVolData, texturePosition1).x;"
       "float value2 = texture2D(uVolData, texturePosition2).x;"
+      
+      # "float value1_0 = texture2D(uVolData, texturePosition1_0).x;"
+      # "float value1_2 = texture2D(uVolData, texturePosition1_2).x;"
+      # 
+      # "float value2_0 = texture2D(uVolData, texturePosition2_0).x;"
+      # "float value2_2 = texture2D(uVolData, texturePosition2_2).x;"
+      
+      # "value1 = (value1_0 + value1 + value1_2) / 3.0;"
+      # "value2 = (value2_0 + value2 + value2_2) / 3.0;"
       
       # Scale pixels
       "value1 = (value1 - uMinimum) / uRange;"
