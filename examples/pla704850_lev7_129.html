@@ -1,0 +1,140 @@
+<html>
+<head>
+  <link rel="stylesheet" href="astrojs.css" type="text/css" charset="utf-8">
+  
+  <style>
+  
+  div.parameter {
+    width: 400px;
+    clear: both;
+  }
+  
+  label {
+    float: left;
+  }
+  
+  input {
+    float: right;
+    width: 300px;
+  }
+  
+  </style>
+  <script type="text/javascript" src="lib/fits.js"></script>
+  
+  <script type="text/javascript" src="lib/gl-matrix.js"></script>
+  <script type="text/javascript" src="../lib/volumetric.js"></script>
+  
+  <script type="text/javascript">
+  
+  function main() {
+    
+    // Initialize Volumetric object
+    var el = document.querySelector("#volume");
+    var volume = new astro.Volumetric(el, 700);
+    var startFrame = 20;
+    
+    var gMinimum;
+    var gMaximum;
+    var minimum;
+    var maximum;
+    
+    new astro.FITS('data/pla704850_lev7_129_32.fits', function(f) {
+      
+      var cube = f.getDataUnit();
+      var width = cube.width;
+      var height = cube.height;
+      var depth = 100;
+      
+      var pixels = new Float32Array(width * height * depth);
+      var frame = 0;
+      
+      cube.getFrames(startFrame, depth, function(arr) {
+        pixels.set(arr, width * height * frame);
+        
+        frame += 1;
+        if (frame === depth) {
+          var extent = cube.getExtent(pixels);
+          gMinimum = minimum = extent[0];
+          gMaximum = maximum = extent[1];
+          
+          volume.setExtent(gMinimum, gMaximum);
+          volume.setTexture(pixels, width, height, depth);
+          volume.draw();
+          window.volume = volume;
+          
+          // Connect UI
+          var lightingEl = document.querySelector("input[data-type='lighting']")
+          var opacityEl = document.querySelector("input[data-type='opacity']")
+          var minimumEl = document.querySelector("input[data-type='minimum']")
+          var maximumEl = document.querySelector("input[data-type='maximum']")
+          var stepEl = document.querySelector("input[data-type='steps']")
+          
+          lightingEl.onchange = function(e) {
+            volume.setLighting(e.target.value);
+          }
+          
+          opacityEl.onchange = function(e) {
+            volume.setOpacity(e.target.value);
+          }
+          
+          minimumEl.onchange = function(e) {
+            value = e.target.value;
+            minimum = (gMaximum - gMinimum) / 1000 * value + gMinimum
+            volume.setExtent(minimum, maximum);
+          }
+          
+          maximumEl.onchange = function(e) {
+            value = e.target.value;
+            maximum = (gMaximum - gMinimum) / 1000 * value + gMinimum
+            volume.setExtent(minimum, maximum);
+          }
+          
+          stepEl.onchange = function(e) {
+            volume.setSteps(e.target.value);
+          }
+          
+          document.querySelector('span.state').textContent = ' READY!';
+          
+          // Test
+          window.volume = volume;
+        }
+      });
+    })
+  }
+  </script>
+  
+</head>
+
+<body onload='main()'>
+  <div class='content'>
+    <h3>pla704850_lev7_129<span class='state'> NOT READY</span></h3>
+    
+    <div class='parameter'>
+      <label>Lighting</label>
+      <input type="range" data-type='lighting' min="0" max="10" step="0.01" value="0.3">
+    </div>
+    
+    <div class='parameter'>
+      <label>Opacity</label>
+      <input type="range" data-type='opacity' min="0" max="100" step="0.01" value="2.0">
+    </div>
+    
+    <div class='parameter'>
+      <label>Minimum</label>
+      <input type="range" data-type='minimum' min="0" max="1000" step="1" value="0">
+    </div>
+    
+    <div class='parameter'>
+      <label>Maximum</label>
+      <input type="range" data-type='maximum' min="0" max="1000" step="1" value="1000">
+    </div>
+    
+    <div class='parameter'>
+      <label>Steps</label>
+      <input type="range" data-type='steps' min="3" max="1000" step="1" value="70">
+    </div>
+    
+    <div id="volume"></div>
+  </div>
+</body>
+</html>

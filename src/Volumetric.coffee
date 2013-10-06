@@ -25,6 +25,10 @@ class Volumetric
     
     gl.attachShader(program, vertexShader)
     gl.attachShader(program, fragmentShader)
+    
+    gl.deleteShader(vertexShader)
+    gl.deleteShader(fragmentShader)
+    
     gl.linkProgram(program)
     
     linked = gl.getProgramParameter(program, gl.LINK_STATUS)
@@ -187,6 +191,23 @@ class Volumetric
     @gl.uniformMatrix4fv(program.uPMatrix, false, @pMatrix)
     @gl.uniformMatrix4fv(program.uMVMatrix, false, @mvMatrix)
   
+  _setRaycastUniforms: (gl) ->
+    @uMinimum = gl.getUniformLocation(@programs.raycast, "uMinimum")
+    @uMaximum = gl.getUniformLocation(@programs.raycast, "uMaximum")
+    @uRange = gl.getUniformLocation(@programs.raycast, "uRange")
+    
+    @uTileWidth = gl.getUniformLocation(@programs.raycast, "uTileWidth")
+    @uTileHeight = gl.getUniformLocation(@programs.raycast, "uTileHeight")
+    @uDimension = gl.getUniformLocation(@programs.raycast, "uDimension")
+    
+    @uBackCoord = gl.getUniformLocation(@programs.raycast, "uBackCoord")
+    @uVolData = gl.getUniformLocation(@programs.raycast, "uVolData")
+    
+    @uTiles = gl.getUniformLocation(@programs.raycast, "uTiles")
+    
+    @uOpacity = gl.getUniformLocation(@programs.raycast, "uOpacity")
+    @uLighting = gl.getUniformLocation(@programs.raycast, "uLight")
+  
   _toRadians: (deg) ->
     return deg * 0.017453292519943295
   
@@ -242,28 +263,26 @@ class Volumetric
   
   constructor: (@el, dimension) ->
     
-    @width = @height = dimension
+    @viewportWidth = @viewportHeight = dimension
     @programs = {}
     
     # Create and attach canvas to DOM
     @canvas = document.createElement('canvas')
-    @canvas.setAttribute('width', @width)
-    @canvas.setAttribute('height', @height)
+    @canvas.setAttribute('width', @viewportWidth)
+    @canvas.setAttribute('height', @viewportHeight)
     @canvas.setAttribute('class', 'volumetric')
     
     @el.appendChild(@canvas)
     
     # Initialize context
     for name in ['webgl', 'experimental-webgl']
-      try
-        gl = @canvas.getContext(name)
-        width = @canvas.width
-        height = @canvas.height
-        gl.viewport(0, 0, width, height)
-      catch e
-        break if (gl)
-    
+      gl = @canvas.getContext(name)
+      width = @canvas.width
+      height = @canvas.height
+      break if gl?
     return null unless gl
+    
+    gl.viewport(0, 0, width, height)
     @gl = gl
     
     # Get the floating point extension
@@ -274,29 +293,13 @@ class Volumetric
     
     # Initialize programs from shaders
     @programs["back"] = @_createProgram(gl, shaders.vertex, shaders.fragment)
-    @programs["raycast"] = @_createProgram(gl, shaders.raycastVertex, shaders.raycastFragment)
+    @programs["raycast"] = @_createProgram(gl, shaders.raycastVertex, shaders.raycastFragment("70.0") )
     
-    # Get uniform locations
-    @uMinimum = gl.getUniformLocation(@programs.raycast, "uMinimum")
-    @uMaximum = gl.getUniformLocation(@programs.raycast, "uMaximum")
-    @uRange = gl.getUniformLocation(@programs.raycast, "uRange")
-    
-    @uTileWidth = gl.getUniformLocation(@programs.raycast, "uTileWidth")
-    @uTileHeight = gl.getUniformLocation(@programs.raycast, "uTileHeight")
-    @uDimension = gl.getUniformLocation(@programs.raycast, "uDimension")
-    
-    @uBackCoord = gl.getUniformLocation(@programs.raycast, "uBackCoord")
-    @uVolData = gl.getUniformLocation(@programs.raycast, "uVolData")
-    
-    @uTiles = gl.getUniformLocation(@programs.raycast, "uTiles")
-    @uSteps = gl.getUniformLocation(@programs.raycast, "uSteps")
-    
-    @uOpacity = gl.getUniformLocation(@programs.raycast, "uOpacity")
-    @uLighting = gl.getUniformLocation(@programs.raycast, "uLight")
+    @_setRaycastUniforms(@gl)
     
     # Initialize buffers
     # TODO: Use packed buffers
-    @frameBuffer = @_initFrameBuffer(gl, @width, @height)
+    @frameBuffer = @_initFrameBuffer(gl, @viewportWidth, @viewportHeight)
     @cubeBuffer = @_initCubeBuffer(gl)
     
     # Set up camera parameters
@@ -309,7 +312,6 @@ class Volumetric
     mat4.identity(@rotationMatrix)
     
     # Set defaults
-    @setSteps(70)
     @setOpacity(2.0)
     @setLighting(0.3)
     
@@ -325,20 +327,55 @@ class Volumetric
     @gl.uniform1f(@uRange, @maximum - @minimum)
     
     @draw()
-    
+  
+  # Updating steps requires rebuilding entire program since one shader value
+  # is a constant. This alleviates GPU computation.
   setSteps: (steps) ->
-    @gl.useProgram( @programs.raycast )
-    @gl.uniform1f(@uSteps, steps)
+    gl = @gl
+    program = @programs.raycast
+    
+    # Detach and delete raycast shaders
+    for shader in gl.getAttachedShaders(program)
+      gl.detachShader(program, shader)
+      gl.deleteShader(shader)
+    
+    # Delete program
+    gl.deleteProgram(program)
+    
+    # Compile new vertex and fragment shader
+    shaders = @constructor.Shaders
+    @programs["raycast"] = @_createProgram(gl, shaders.raycastVertex, shaders.raycastFragment("#{steps}.0") )
+    @_setRaycastUniforms(gl)
+    
+    gl.useProgram(@programs.raycast)
+    
+    gl.activeTexture(gl.TEXTURE0)
+    
+    gl.uniform1f(@uTiles, @depth)
+    gl.uniform1f(@uTileWidth, @width)
+    gl.uniform1f(@uTileHeight, @height)
+    gl.uniform1f(@uDimension, @dimension)
+    
+    gl.uniform1f(@uMinimum, @minimum)
+    gl.uniform1f(@uMaximum, @maximum)
+    gl.uniform1f(@uRange, @maximum - @minimum)
+    
+    gl.uniform1f(@uOpacity, @opacity)
+    gl.uniform1f(@uLighting, @lighting)
     
     @draw()
   
   setOpacity: (opacity) ->
+    @opacity = opacity
+    
     @gl.useProgram( @programs.raycast )
     @gl.uniform1f(@uOpacity, opacity)
     
     @draw()
   
   setLighting: (lighting) ->
+    @lighting = lighting
+    
     @gl.useProgram( @programs.raycast )
     @gl.uniform1f(@uLighting, lighting)
     
@@ -375,6 +412,12 @@ class Volumetric
     
     @gl.bindTexture(@gl.TEXTURE_2D, null)
     @hasTexture = true
+    
+    # TEMP: Setting variables here to test setStep program reconstruction.
+    @width = width
+    @height = height
+    @depth = depth
+    @dimension = dimension
   
   _drawCube: (program) ->
     @gl.clear(@gl.COLOR_BUFFER_BIT | @gl.DEPTH_BUFFER_BIT)
@@ -425,4 +468,4 @@ class Volumetric
 
 @astro = {} unless @astro?
 @astro.Volumetric = Volumetric
-@astro.Volumetric.version = '0.1.0'
+@astro.Volumetric.version = '0.2.0'

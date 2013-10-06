@@ -165,6 +165,10 @@
       var height = cube.height;
       var depth = cube.depth;
       
+      // Select the start frame and depth manually
+      startFrame = 20;
+      depth = depth - startFrame - 10;
+      
       // Allocate storage for cube
       var pixels = new Float32Array(width * height * depth);
       var frame = 0;

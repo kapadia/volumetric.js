@@ -25,6 +25,8 @@
       program = gl.createProgram();
       gl.attachShader(program, vertexShader);
       gl.attachShader(program, fragmentShader);
+      gl.deleteShader(vertexShader);
+      gl.deleteShader(fragmentShader);
       gl.linkProgram(program);
       linked = gl.getProgramParameter(program, gl.LINK_STATUS);
       if (!linked) {
@@ -93,6 +95,20 @@
       return this.gl.uniformMatrix4fv(program.uMVMatrix, false, this.mvMatrix);
     };
 
+    Volumetric.prototype._setRaycastUniforms = function(gl) {
+      this.uMinimum = gl.getUniformLocation(this.programs.raycast, "uMinimum");
+      this.uMaximum = gl.getUniformLocation(this.programs.raycast, "uMaximum");
+      this.uRange = gl.getUniformLocation(this.programs.raycast, "uRange");
+      this.uTileWidth = gl.getUniformLocation(this.programs.raycast, "uTileWidth");
+      this.uTileHeight = gl.getUniformLocation(this.programs.raycast, "uTileHeight");
+      this.uDimension = gl.getUniformLocation(this.programs.raycast, "uDimension");
+      this.uBackCoord = gl.getUniformLocation(this.programs.raycast, "uBackCoord");
+      this.uVolData = gl.getUniformLocation(this.programs.raycast, "uVolData");
+      this.uTiles = gl.getUniformLocation(this.programs.raycast, "uTiles");
+      this.uOpacity = gl.getUniformLocation(this.programs.raycast, "uOpacity");
+      return this.uLighting = gl.getUniformLocation(this.programs.raycast, "uLight");
+    };
+
     Volumetric.prototype._toRadians = function(deg) {
       return deg * 0.017453292519943295;
     };
@@ -148,33 +164,29 @@
     };
 
     function Volumetric(el, dimension) {
-      var e, ext, gl, height, name, shaders, width, _i, _len, _ref;
+      var ext, gl, height, name, shaders, width, _i, _len, _ref;
       this.el = el;
-      this.width = this.height = dimension;
+      this.viewportWidth = this.viewportHeight = dimension;
       this.programs = {};
       this.canvas = document.createElement('canvas');
-      this.canvas.setAttribute('width', this.width);
-      this.canvas.setAttribute('height', this.height);
+      this.canvas.setAttribute('width', this.viewportWidth);
+      this.canvas.setAttribute('height', this.viewportHeight);
       this.canvas.setAttribute('class', 'volumetric');
       this.el.appendChild(this.canvas);
       _ref = ['webgl', 'experimental-webgl'];
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         name = _ref[_i];
-        try {
-          gl = this.canvas.getContext(name);
-          width = this.canvas.width;
-          height = this.canvas.height;
-          gl.viewport(0, 0, width, height);
-        } catch (_error) {
-          e = _error;
-          if (gl) {
-            break;
-          }
+        gl = this.canvas.getContext(name);
+        width = this.canvas.width;
+        height = this.canvas.height;
+        if (gl != null) {
+          break;
         }
       }
       if (!gl) {
         return null;
       }
+      gl.viewport(0, 0, width, height);
       this.gl = gl;
       ext = gl.getExtension('OES_texture_float');
       if (!ext) {
@@ -182,20 +194,9 @@
       }
       shaders = this.constructor.Shaders;
       this.programs["back"] = this._createProgram(gl, shaders.vertex, shaders.fragment);
-      this.programs["raycast"] = this._createProgram(gl, shaders.raycastVertex, shaders.raycastFragment);
-      this.uMinimum = gl.getUniformLocation(this.programs.raycast, "uMinimum");
-      this.uMaximum = gl.getUniformLocation(this.programs.raycast, "uMaximum");
-      this.uRange = gl.getUniformLocation(this.programs.raycast, "uRange");
-      this.uTileWidth = gl.getUniformLocation(this.programs.raycast, "uTileWidth");
-      this.uTileHeight = gl.getUniformLocation(this.programs.raycast, "uTileHeight");
-      this.uDimension = gl.getUniformLocation(this.programs.raycast, "uDimension");
-      this.uBackCoord = gl.getUniformLocation(this.programs.raycast, "uBackCoord");
-      this.uVolData = gl.getUniformLocation(this.programs.raycast, "uVolData");
-      this.uTiles = gl.getUniformLocation(this.programs.raycast, "uTiles");
-      this.uSteps = gl.getUniformLocation(this.programs.raycast, "uSteps");
-      this.uOpacity = gl.getUniformLocation(this.programs.raycast, "uOpacity");
-      this.uLighting = gl.getUniformLocation(this.programs.raycast, "uLight");
-      this.frameBuffer = this._initFrameBuffer(gl, this.width, this.height);
+      this.programs["raycast"] = this._createProgram(gl, shaders.raycastVertex, shaders.raycastFragment("70.0"));
+      this._setRaycastUniforms(this.gl);
+      this.frameBuffer = this._initFrameBuffer(gl, this.viewportWidth, this.viewportHeight);
       this.cubeBuffer = this._initCubeBuffer(gl);
       this.zoom = 2.0;
       this.pMatrix = mat4.create();
@@ -203,7 +204,6 @@
       this.rotationMatrix = mat4.create();
       mat4.perspective(this.pMatrix, 45.0, 1.0, 0.1, 100.0);
       mat4.identity(this.rotationMatrix);
-      this.setSteps(70);
       this.setOpacity(2.0);
       this.setLighting(0.3);
       this._setupMouseControls();
@@ -221,18 +221,42 @@
     };
 
     Volumetric.prototype.setSteps = function(steps) {
-      this.gl.useProgram(this.programs.raycast);
-      this.gl.uniform1f(this.uSteps, steps);
+      var gl, program, shader, shaders, _i, _len, _ref;
+      gl = this.gl;
+      program = this.programs.raycast;
+      _ref = gl.getAttachedShaders(program);
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        shader = _ref[_i];
+        gl.detachShader(program, shader);
+        gl.deleteShader(shader);
+      }
+      gl.deleteProgram(program);
+      shaders = this.constructor.Shaders;
+      this.programs["raycast"] = this._createProgram(gl, shaders.raycastVertex, shaders.raycastFragment("" + steps + ".0"));
+      this._setRaycastUniforms(gl);
+      gl.useProgram(this.programs.raycast);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.uniform1f(this.uTiles, this.depth);
+      gl.uniform1f(this.uTileWidth, this.width);
+      gl.uniform1f(this.uTileHeight, this.height);
+      gl.uniform1f(this.uDimension, this.dimension);
+      gl.uniform1f(this.uMinimum, this.minimum);
+      gl.uniform1f(this.uMaximum, this.maximum);
+      gl.uniform1f(this.uRange, this.maximum - this.minimum);
+      gl.uniform1f(this.uOpacity, this.opacity);
+      gl.uniform1f(this.uLighting, this.lighting);
       return this.draw();
     };
 
     Volumetric.prototype.setOpacity = function(opacity) {
+      this.opacity = opacity;
       this.gl.useProgram(this.programs.raycast);
       this.gl.uniform1f(this.uOpacity, opacity);
       return this.draw();
     };
 
     Volumetric.prototype.setLighting = function(lighting) {
+      this.lighting = lighting;
       this.gl.useProgram(this.programs.raycast);
       this.gl.uniform1f(this.uLighting, lighting);
       return this.draw();
@@ -262,7 +286,11 @@
       }
       this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.LUMINANCE, dimension, dimension, 0, this.gl.LUMINANCE, this.gl.FLOAT, pixels);
       this.gl.bindTexture(this.gl.TEXTURE_2D, null);
-      return this.hasTexture = true;
+      this.hasTexture = true;
+      this.width = width;
+      this.height = height;
+      this.depth = depth;
+      return this.dimension = dimension;
     };
 
     Volumetric.prototype._drawCube = function(program) {
@@ -311,13 +339,15 @@
 
   this.astro.Volumetric = Volumetric;
 
-  this.astro.Volumetric.version = '0.1.0';
+  this.astro.Volumetric.version = '0.2.0';
 
   Shaders = {
     vertex: ["precision mediump float;", "attribute vec3 aVertexPosition;", "attribute vec4 aVertexColor;", "uniform mat4 uMVMatrix;", "uniform mat4 uPMatrix;", "varying vec4 backColor;", "void main() {", "vec4 position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);", "backColor = aVertexColor;", "gl_Position = position;", "}"].join("\n"),
     fragment: ["precision mediump float;", "varying vec4 backColor;", "void main() {", "gl_FragColor = backColor;", "}"].join("\n"),
     raycastVertex: ["precision mediump float;", "attribute vec3 aVertexPosition;", "attribute vec4 aVertexColor;", "uniform mat4 uMVMatrix;", "uniform mat4 uPMatrix;", "varying vec4 frontColor;", "varying vec4 position;", "void main() {", "position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);", "frontColor = aVertexColor;", "gl_Position = position;", "}"].join("\n"),
-    raycastFragment: ["precision mediump float;", "varying vec4 frontColor;", "varying vec4 position;", "uniform sampler2D uBackCoord;", "uniform sampler2D uVolData;", "uniform float uMinimum;", "uniform float uMaximum;", "uniform float uRange;", "uniform float uTiles;", "uniform float uTileWidth;", "uniform float uTileHeight;", "uniform float uDimension;", "uniform float uSteps;", "uniform float uOpacity;", "uniform float uLight;", "const float MAXSTEPS = 500.0;", "float getTextureValue(vec3 volumePosition) {", "vec2 texturePosition1;", "vec2 texturePosition2;", "float zp1 = floor(volumePosition.z * uTiles);", "float zp2 = zp1 + 1.0;", "float xp = floor(uTileWidth * volumePosition.x);", "float yp = floor(uTileHeight * volumePosition.y);", "float index1 = zp1 * uTileWidth * uTileHeight + yp * uTileWidth + xp;", "float index2 = zp2 * uTileWidth * uTileHeight + yp * uTileWidth + xp;", "float xt1 = mod(index1, uDimension);", "float yt1 = floor(index1 / uDimension);", "float xt2 = mod(index2, uDimension);", "float yt2 = floor(index2 / uDimension);", "texturePosition1.x = xt1 / uDimension;", "texturePosition1.y = yt1 / uDimension;", "texturePosition2.x = xt2 / uDimension;", "texturePosition2.y = yt2 / uDimension;", "float value1 = texture2D(uVolData, texturePosition1).x;", "float value2 = texture2D(uVolData, texturePosition2).x;", "value1 = (value1 - uMinimum) / uRange;", "value2 = (value2 - uMinimum) / uRange;", "return mix( value1, value2, (volumePosition.z * uTiles) - zp1 );", "}", "void main() {", "vec2 textureCoord = position.xy / position.w;", "textureCoord.x = 0.5 * textureCoord.x + 0.5;", "textureCoord.y = 0.5 * textureCoord.y + 0.5;", "vec4 backColor = texture2D(uBackCoord, textureCoord);", "vec3 color = backColor.rgb - frontColor.rgb;", "vec4 vpos = frontColor;", "float steps = min(uSteps, MAXSTEPS);", "vec3 step = color / steps;", "vec4 accum = vec4(0.0, 0.0, 0.0, 0.0);", "vec4 sample = vec4(0.0, 0.0, 0.0, 0.0);", "vec4 value = vec4(0.0, 0.0, 0.0, 0.0);", "vec2 transferPosition;", "for(float i = 0.0; i < MAXSTEPS; i += 1.0) {", "if (i > steps)", "break;", "transferPosition.x = getTextureValue(vpos.xyz);", "transferPosition.y = 0.5;", "value = vec4(transferPosition.x);", "sample.a = value.a * uOpacity * (1.0 / steps);", "sample.rgb = value.rgb * sample.a * uLight;", "accum.rgb += (1.0 - accum.a) * sample.rgb;", "accum.a += sample.a;", "vpos.xyz += step;", "if (vpos.x > 1.0 || vpos.y > 1.0 || vpos.z > 1.0 || accum.a >= 1.0)", "break;", "}", "gl_FragColor = accum;", "}"].join("\n")
+    raycastFragment: function(STEPS) {
+      return ["precision highp float;", "varying vec4 frontColor;", "varying vec4 position;", "uniform sampler2D uBackCoord;", "uniform sampler2D uVolData;", "uniform float uMinimum;", "uniform float uMaximum;", "uniform float uRange;", "uniform float uTiles;", "uniform float uTileWidth;", "uniform float uTileHeight;", "uniform float uDimension;", "uniform float uOpacity;", "uniform float uLight;", "const float MAXSTEPS = " + STEPS + ";", "float getTextureValue(vec3 volumePosition) {", "vec2 texturePosition1;", "vec2 texturePosition2;", "float zp1 = floor(volumePosition.z * uTiles);", "float zp2 = zp1 + 1.0;", "float xp = floor(uTileWidth * volumePosition.x);", "float yp = floor(uTileHeight * volumePosition.y);", "float index1 = zp1 * uTileWidth * uTileHeight + yp * uTileWidth + xp;", "float index2 = zp2 * uTileWidth * uTileHeight + yp * uTileWidth + xp;", "float xt1 = mod(index1, uDimension);", "float yt1 = floor(index1 / uDimension);", "float xt2 = mod(index2, uDimension);", "float yt2 = floor(index2 / uDimension);", "texturePosition1.x = xt1 / uDimension;", "texturePosition1.y = yt1 / uDimension;", "texturePosition2.x = xt2 / uDimension;", "texturePosition2.y = yt2 / uDimension;", "float value1 = texture2D(uVolData, texturePosition1).x;", "float value2 = texture2D(uVolData, texturePosition2).x;", "value1 = (value1 - uMinimum) / uRange;", "value2 = (value2 - uMinimum) / uRange;", "return mix( value1, value2, (volumePosition.z * uTiles) - zp1 );", "}", "void main() {", "vec2 textureCoord = position.xy / position.w;", "textureCoord.x = 0.5 * textureCoord.x + 0.5;", "textureCoord.y = 0.5 * textureCoord.y + 0.5;", "vec4 backColor = texture2D(uBackCoord, textureCoord);", "vec3 color = backColor.rgb - frontColor.rgb;", "vec4 vpos = frontColor;", "vec3 step = color / MAXSTEPS;", "vec4 accum = vec4(0.0, 0.0, 0.0, 0.0);", "vec4 sample = vec4(0.0, 0.0, 0.0, 0.0);", "vec4 value = vec4(0.0, 0.0, 0.0, 0.0);", "vec2 transferPosition;", "for(float i = 0.0; i < MAXSTEPS; i += 1.0) {", "transferPosition.x = getTextureValue(vpos.xyz);", "transferPosition.y = 0.5;", "value = vec4(transferPosition.x);", "sample.a = value.a * uOpacity * (1.0 / MAXSTEPS);", "sample.rgb = value.rgb * sample.a * uLight;", "accum.rgb += (1.0 - accum.a) * sample.rgb;", "accum.a += sample.a;", "vpos.xyz += step;", "}", "gl_FragColor = accum;", "}"].join("\n");
+    }
   };
 
   this.astro.Volumetric.Shaders = Shaders;

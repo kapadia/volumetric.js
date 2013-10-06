@@ -1,13 +1,13 @@
 {print} = require 'util'
 {spawn} = require 'child_process'
 
-task 'build', 'Build lib/ from src/', ->
+task 'build', 'Build dist/ from src/', ->
   
   # Get parameters from package.json
   pkg = require('./package.json')
   
   # Specify the name of the library
-  output = "lib/#{pkg['name']}.js"
+  output = "dist/#{pkg['name']}.js"
   
   # Check that developer has specified a dependency order
   unless pkg['_dependencyOrder']?
@@ -33,13 +33,13 @@ task 'build', 'Build lib/ from src/', ->
     callback?() if code is 0
 
 
-task 'server', 'Build lib/ from src/', ->
+task 'server', 'Build dist/ from src/', ->
   
   # Get parameters from package.json
   pkg = require('./package.json')
   
   # Specify the name of the library
-  output = "lib/#{pkg['name']}"
+  output = "dist/#{pkg['name']}"
   
   # Check that developer has specified a dependency order
   unless pkg['_dependencyOrder']?
