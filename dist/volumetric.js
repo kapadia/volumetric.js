@@ -262,6 +262,8 @@
       return this.draw();
     };
 
+    Volumetric.prototype.setTexture2 = function(arr, width, height, depth) {};
+
     Volumetric.prototype.setTexture = function(arr, width, height, depth) {
       var dimension, length, pixels;
       length = arr.length;

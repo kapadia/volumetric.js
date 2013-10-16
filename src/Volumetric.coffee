@@ -381,6 +381,14 @@ class Volumetric
     
     @draw()
   
+  # TESTING:  Smarter functionality when setting texture. This method takes any size array,
+  #           and will optimize the 2D texture size.
+  setTexture2: (arr, width, height, depth) ->
+    
+    # Determine maximum texture size
+    
+    
+  
   setTexture: (arr, width, height, depth) ->
     length = arr.length
     
