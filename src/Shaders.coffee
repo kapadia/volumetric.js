@@ -146,8 +146,8 @@ Shaders =
           
           "vpos.xyz += step;"
           
-          # "if (vpos.x > 1.0 || vpos.y > 1.0 || vpos.z > 1.0 || accum.a >= 1.0)"
-          #   "break;"
+          "if (vpos.x > 1.0 || vpos.y > 1.0 || vpos.z > 1.0 || accum.a >= 1.0)"
+            "break;"
         "}"
         
         "gl_FragColor = accum;"

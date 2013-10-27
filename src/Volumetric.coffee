@@ -476,4 +476,4 @@ class Volumetric
 
 @astro = {} unless @astro?
 @astro.Volumetric = Volumetric
-@astro.Volumetric.version = '0.2.0'
+@astro.Volumetric.version = '0.2.1'
