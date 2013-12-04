@@ -1,0 +1,27 @@
+{
+  "name": "volumetric.js",
+  "version": "0.2.1",
+  "homepage": "https://github.com/kapadia/volumetric.js",
+  "authors": [
+    "Amit Kapadia <akapad@gmail.com>"
+  ],
+  "description": "A WebGL library to easily create volumetric renderings of scientific data",
+  "main": "volumetric.js",
+  "keywords": [
+    "webgl",
+    "science",
+    "raw images",
+    "high bit depth",
+    "visualization",
+    "volume rendering"
+  ],
+  "dependencies": {
+    "gl-matrix": "2.2.x"
+  },
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components"
+  ]
+}

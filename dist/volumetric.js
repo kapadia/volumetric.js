@@ -341,7 +341,7 @@
 
   this.astro.Volumetric = Volumetric;
 
-  this.astro.Volumetric.version = '0.2.0';
+  this.astro.Volumetric.version = '0.2.1';
 
   Shaders = {
     vertex: ["precision mediump float;", "attribute vec3 aVertexPosition;", "attribute vec4 aVertexColor;", "uniform mat4 uMVMatrix;", "uniform mat4 uPMatrix;", "varying vec4 backColor;", "void main() {", "vec4 position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);", "backColor = aVertexColor;", "gl_Position = position;", "}"].join("\n"),

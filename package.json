@@ -1,22 +1,24 @@
 {
   "name": "volumetric.js",
   "version": "0.2.1",
-  "author": "Amit Kapadia <amit@zooniverse.org>",
+  "description": "A WebGL library to easily create volumetric renderings of scientific data.",
+  "author": "Amit Kapadia <akapad@gmail.com>",
+  "keywords": [
+    "webgl",
+    "science",
+    "raw images",
+    "high bit depth",
+    "visualization",
+    "volume rendering"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/kapadia/volumetric.js.git"
   },
   "dependencies": {
   },
-  "scripts": {
-    "start": "cake server"
-  },
   "devDependencies": {
-    "coffee-script" : "~1.6.x",
-    "http-server": "~0.5.x"
-  },
-  "_dependencyOrder": [
-    "Volumetric",
-    "Shaders"
-  ]
+    "http-server": "~0.5.x",
+    "uglify-js": "2.4.x"
+  }
 }
