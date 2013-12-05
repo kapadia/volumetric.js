@@ -17,7 +17,7 @@ volumetric.shaders = {
       "backColor = aVertexColor;",
       "gl_Position = position;",
     "}"
-  ].join(''),
+  ].join('\n'),
   
   fragment: [
     "precision mediump float;",
@@ -26,7 +26,7 @@ volumetric.shaders = {
     "void main() {",
       "gl_FragColor = backColor;",
     "}"
-  ].join(''),
+  ].join('\n'),
   
   raycastVertex: [
     "precision mediump float;",
@@ -45,7 +45,7 @@ volumetric.shaders = {
       "frontColor = aVertexColor;",
       "gl_Position = position;",
     "}"
-  ].join(''),
+  ].join('\n'),
   
   raycastFragment: function(STEPS) {
     return [
@@ -153,6 +153,6 @@ volumetric.shaders = {
         "gl_FragColor = accum;",
         
       "}"
-    ].join('')
+    ].join('\n')
   }
 };

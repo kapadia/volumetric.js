@@ -35,6 +35,15 @@ volumetric = (function(){  volumetric.prototype.loadShader = function(source, ty
       return null;
     }
     
+    program.vertexPositionAttribute = gl.getAttribLocation(program, "aVertexPosition")
+    gl.enableVertexAttribArray(program.vertexPositionAttribute)
+  
+    program.vertexColorAttribute = gl.getAttribLocation(program, "aVertexColor")
+    gl.enableVertexAttribArray(program.vertexColorAttribute)
+  
+    program.uPMatrix = gl.getUniformLocation(program, "uPMatrix")
+    program.uMVMatrix = gl.getUniformLocation(program, "uMVMatrix")
+    
     return program;
   };
   
@@ -163,7 +172,12 @@ volumetric = (function(){  volumetric.prototype.loadShader = function(source, ty
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeBuffer.vertexIndexBuffer);
     // TODO: Try using a Uint8Array
     indexVertices = new Uint16Array([
-      0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23
+      0, 1, 2, 0, 2, 3,       // Front face
+      4, 5, 6, 4, 6, 7,       // Back face
+      8, 9, 10, 8, 10, 11,    // Top face
+      12, 13, 14, 12, 14, 15, // Bottom face
+      16, 17, 18, 16, 18, 19, // Right face
+      20, 21, 22, 20, 22, 23  // Left face
     ]);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexVertices, gl.STATIC_DRAW);
     cubeBuffer.vertexIndexBuffer.itemSize = 1;
@@ -374,6 +388,8 @@ volumetric = (function(){  volumetric.prototype.loadShader = function(source, ty
   volumetric.prototype.setTexture = function(arr, width, height, depth) {
     var dimension, length, pixels;
     
+    length = arr.length;
+    
     this.width = width;
     this.height = height;
     this.depth = depth;
@@ -383,7 +399,6 @@ volumetric = (function(){  volumetric.prototype.loadShader = function(source, ty
     dimension = this.toPower2(dimension);
     this.dimension = dimension;
     
-    length = arr.length;
     while (length--) {
       arr[length] = isNaN(arr[length]) ? 0 : arr[length];
     }
@@ -411,23 +426,24 @@ volumetric = (function(){  volumetric.prototype.loadShader = function(source, ty
   };
   
   volumetric.prototype.drawCube = function(program) {
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+    var gl = this.gl;
+    
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     
     mat4.identity(this.mvMatrix);
     mat4.translate(this.mvMatrix, this.mvMatrix, [0.0, 0.0, -this.zoom]);
     mat4.multiply(this.mvMatrix, this.mvMatrix, this.rotationMatrix);
     mat4.translate(this.mvMatrix, this.mvMatrix, [-0.5, -0.5, -0.5]);
     
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.cubeBuffer.vertexPositionBuffer);
-    this.gl.vertexAttribPointer(program.vertexPositionAttribute, this.cubeBuffer.vertexPositionBuffer.itemSize, this.gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.cubeBuffer.vertexPositionBuffer);
+    gl.vertexAttribPointer(program.vertexPositionAttribute, this.cubeBuffer.vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
     
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.cubeBuffer.vertexColorBuffer);
-    this.gl.vertexAttribPointer(program.vertexColorAttribute, this.cubeBuffer.vertexColorBuffer.itemSize, this.gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.cubeBuffer.vertexColorBuffer);
+    gl.vertexAttribPointer(program.vertexColorAttribute, this.cubeBuffer.vertexColorBuffer.itemSize, gl.FLOAT, false, 0, 0);
     
-    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.cubeBuffer.vertexIndexBuffer);
-    
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.cubeBuffer.vertexIndexBuffer);
     this.setMatrixUniforms(program);
-    this.gl.drawElements(this.gl.TRIANGLES, this.cubeBuffer.vertexIndexBuffer.numItems, this.gl.UNSIGNED_SHORT, 0);
+    gl.drawElements(gl.TRIANGLES, this.cubeBuffer.vertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
   };
   
   volumetric.prototype.draw = function() {
@@ -478,7 +494,7 @@ volumetric = (function(){  volumetric.prototype.loadShader = function(source, ty
         "backColor = aVertexColor;",
         "gl_Position = position;",
       "}"
-    ].join(''),
+    ].join('\n'),
     
     fragment: [
       "precision mediump float;",
@@ -487,7 +503,7 @@ volumetric = (function(){  volumetric.prototype.loadShader = function(source, ty
       "void main() {",
         "gl_FragColor = backColor;",
       "}"
-    ].join(''),
+    ].join('\n'),
     
     raycastVertex: [
       "precision mediump float;",
@@ -506,7 +522,7 @@ volumetric = (function(){  volumetric.prototype.loadShader = function(source, ty
         "frontColor = aVertexColor;",
         "gl_Position = position;",
       "}"
-    ].join(''),
+    ].join('\n'),
     
     raycastFragment: function(STEPS) {
       return [
@@ -614,7 +630,7 @@ volumetric = (function(){  volumetric.prototype.loadShader = function(source, ty
           "gl_FragColor = accum;",
           
         "}"
-      ].join('')
+      ].join('\n')
     }
   };
   volumetric.version = "0.2.1";

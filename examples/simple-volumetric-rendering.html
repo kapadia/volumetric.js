@@ -32,14 +32,11 @@
         frame += 1;
         if (frame === depth) {
           var extent = cube.getExtent(pixels);
+          
           volume.setExtent(extent[0], extent[1]);
           volume.setTexture(pixels, width, height, depth);
-          
-          // Testing dynamic texture sizing
-          // volume.setTexture2(pixels, width, height, depth);
           volume.draw();
           
-          // Test
           window.volume = volume;
         }
       });
