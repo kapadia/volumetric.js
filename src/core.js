@@ -14,7 +14,6 @@ volumetric.prototype.loadShader = function(source, type) {
     throw "Error compiling shader " + shader + ": " + error;
     return null;
   }
-  this.shaders.push(shader);
   
   return shader;
 };
@@ -66,8 +65,9 @@ volumetric.prototype.initializeFrameBuffer = function(width, height) {
 };
 
 volumetric.prototype.initializeCubeBuffer = function() {
-  var cubeBuffer, positionVertices, colorVerticies, indexVertices;
+  var gl, cubeBuffer, positionVertices, colorVerticies, indexVertices;
   
+  gl = this.gl;
   cubeBuffer = {};
   
   // Vertex Position Buffer
@@ -259,7 +259,7 @@ volumetric.prototype.setupControls = function() {
 };
 
 function volumetric(el, dimension) {
-  var ext, shaders;
+  var ext, shaders, vertexShader, fragmentShader, raycastVertexShader, raycastFragmentShader;
   
   this.el = el;
   this.canvas = document.createElement('canvas');
@@ -279,9 +279,16 @@ function volumetric(el, dimension) {
   
   shaders = volumetric.shaders;
   
+  vertexShader = this.loadShader(volumetric.shaders.vertex, this.gl.VERTEX_SHADER);
+  fragmentShader = this.loadShader(volumetric.shaders.fragment, this.gl.FRAGMENT_SHADER);
+  raycastVertexShader = this.loadShader(volumetric.shaders.raycastVertex, this.gl.VERTEX_SHADER);
+  raycastFragmentShader = this.loadShader(volumetric.shaders.raycastFragment("70.0"), this.gl.FRAGMENT_SHADER);
+  
+  if (!vertexShader || !fragmentShader || !raycastVertexShader || !raycastFragmentShader) return false;
+  
   this.programs = {};
-  this.programs["back"] = this.createProgram(shaders.vertex, shaders.fragment);
-  this.programs["raycast"] = this.createProgram(shaders.raycastVertex, shaders.raycastFragment("70.0"));
+  this.programs["back"] = this.createProgram(vertexShader, fragmentShader);
+  this.programs["raycast"] = this.createProgram(raycastVertexShader, raycastFragmentShader);
   
   this.getRaycastUniforms();
   this.initializeFrameBuffer(dimension, dimension);
@@ -350,14 +357,14 @@ volumetric.prototype.setSteps = function(value) {
   this.draw();
 };
 
-volumetric.prototype.setOpacity = function() {
+volumetric.prototype.setOpacity = function(opacity) {
   this.opacity = opacity;
   this.gl.useProgram(this.programs.raycast);
   this.gl.uniform1f(this.uOpacity, opacity);
   this.draw();
 };
 
-volumetric.prototype.setLighting = function() {
+volumetric.prototype.setLighting = function(lighting) {
   this.lighting = lighting;
   this.gl.useProgram(this.programs.raycast);
   this.gl.uniform1f(this.uLighting, lighting);

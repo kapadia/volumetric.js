@@ -3,8 +3,8 @@
   <link rel="stylesheet" href="astrojs.css" type="text/css" charset="utf-8">
   <script type="text/javascript" src="lib/fits.js"></script>
   
-  <script type="text/javascript" src="lib/gl-matrix.js"></script>
-  <script type="text/javascript" src="../dist/volumetric.js"></script>
+  <script type="text/javascript" src="/bower_components/gl-matrix/dist/gl-matrix.js"></script>
+  <script type="text/javascript" src="/volumetric.js"></script>
   
   <script type="text/javascript">
   
@@ -12,7 +12,7 @@
     
     // Initialize Volumetric object
     var el = document.querySelector("#volume");
-    var volume = new astro.Volumetric(el, 700);
+    var volume = new volumetric(el, 700);
     var startFrame = 150;
     // var startFrame = 15;
     
